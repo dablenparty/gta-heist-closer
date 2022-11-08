@@ -1,4 +1,6 @@
+import ctypes
 import os
+import traceback
 import psutil
 import signal
 import subprocess as sp
@@ -9,15 +11,31 @@ from python_imagesearch.imagesearch import imagesearch_region_loop
 NETSH_COMMAND = 'netsh interface set interface "Ethernet"'
 
 
-def get_main_monitor_resolution():
-    import ctypes
+def is_user_admin():
+    """
+    Checks if the current user has admin privileges.
 
+    Taken from: https://gist.github.com/sylvainpelissier/ff072a6759082590a4fe8f7e070a4952
+
+    :return: True if the user has admin privileges, False otherwise.
+    :rtype: bool
+    """
+    if os.name == "nt":
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except Exception:
+            traceback.print_exc()
+            print("Admin check failed, assuming not an admin.")
+            return False
+    else:
+        # check for root on posix
+        return os.getuid() == 0
+
+
+def get_main_monitor_resolution():
     user32 = ctypes.windll.user32
     screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
     return screensize
-
-
-print(get_main_monitor_resolution())
 
 
 def disable_network():
@@ -59,7 +77,7 @@ def main():
     y2 = y1 + 1000
     print("Searching for image...")
     image_path = os.path.join(os.path.dirname(__file__), "heist_passed_cropped.jpg")
-    #? TODO: custom impl to cap directly from window
+    # ? TODO: custom impl to cap directly from window
     pos = imagesearch_region_loop(image_path, 0.2, x1, y1, x2, y2, 0.7)
     if pos[0] == -1:
         print("the image was somehow not found")
