@@ -25,9 +25,13 @@ def main():
         requirements_file = this_file.parent / "requirements.txt"
         sp.run([virtual_interpreter, "-m", "pip", "install", "-r", requirements_file])
     print(f"virtual environment found at {virtual_env_dir}")
-    print("running main.py")
-    sp.run([virtual_interpreter, this_file.parent / "main.py"])
+    cmd_args = sys.argv[1:]
+    print(f"running main.py with args {cmd_args}")
+    sp.run([virtual_interpreter, this_file.parent / "main.py", *cmd_args])
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("keyboard interrupt, exiting")
