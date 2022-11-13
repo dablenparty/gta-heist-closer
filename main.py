@@ -1,3 +1,4 @@
+import argparse as ap
 import ctypes
 import os
 from pathlib import Path
@@ -10,7 +11,16 @@ import time
 import cv2
 from python_imagesearch.imagesearch import imagesearch_region_loop
 
-NETSH_COMMAND = 'netsh interface set interface "Ethernet"'
+
+def parse_args():
+    parser = ap.ArgumentParser()
+    parser.add_argument(
+        "--network",
+        "-n",
+        action="store_true",
+        help="disables network instead of killing GTA process",
+    )
+    return parser.parse_args()
 
 
 def is_user_admin():
@@ -41,20 +51,34 @@ def get_main_monitor_resolution():
 
 
 def disable_network():
-    print(f"disabling ethernet")
-    disable_result = sp.run(NETSH_COMMAND + " disable", shell=True)
-    if disable_result.returncode != 0:
-        print("failed to disable ethernet")
-        return
-    # wait 30 seconds
-    timeout = 30
+    interfaces = psutil.net_if_addrs()
+
+    def interface_filter(interface_name: str):
+        lower_name = interface_name.lower()
+        return not (
+            lower_name.startswith("local area connection")
+            or lower_name.startswith("loopback")
+        )
+
+    interface_names = tuple(filter(interface_filter, interfaces.keys()))
+    netsh_command = "netsh interface set interface"
+    for name in interface_names:
+        print(f"disabling {name}")
+        disable_result = sp.run(f'{netsh_command} "{name}" disable', shell=True)
+        if disable_result.returncode != 0:
+            print(f"failed to disable {name}")
+
+    # TODO: make this a command line arg
+    timeout = 20
     for i in range(timeout):
         print(f"\33[2Kwaiting {timeout - i} seconds", end="\r", flush=True)
         time.sleep(1)
-    print("re-enabling ethernet")
-    enable_result = sp.run(NETSH_COMMAND + " enable", shell=True)
-    if enable_result.returncode != 0:
-        print("failed to enable ethernet")
+    print()
+    for name in interface_names:
+        print(f"re-enabling {name}")
+        disable_result = sp.run(f'{netsh_command} "{name}" enabled', shell=True)
+        if disable_result.returncode != 0:
+            print(f"failed to re-enable {name}")
 
 
 def kill_process():
@@ -82,6 +106,9 @@ def resize_image(image_path: Path, monitor_width: int):
 
 
 def main():
+    args = parse_args()
+    if args.network and not is_user_admin():
+        raise RuntimeError("must be run as admin to disable network")
     mon_width, mon_height = get_main_monitor_resolution()
     x1 = 0
     y1 = round(mon_height / 5.76)
@@ -101,9 +128,12 @@ def main():
         return
     print(f"image located at {pos[0]}, {pos[1]}")
     time.sleep(1)
-    # disable_network()
-    kill_process()
+    if args.network:
+        disable_network()
+    else:
+        kill_process()
     input("press enter to exit...")
+
 
 if __name__ == "__main__":
     main()
