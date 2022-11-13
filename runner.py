@@ -28,6 +28,7 @@ def main():
     cmd_args = sys.argv[1:]
     print(f"running main.py with args {cmd_args}")
     sp.run([virtual_interpreter, this_file.parent / "main.py", *cmd_args])
+    input("press enter to exit...")
 
 
 if __name__ == "__main__":
