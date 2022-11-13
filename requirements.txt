@@ -18,3 +18,4 @@ PyScreeze==0.1.28
 python-imagesearch==1.2.2
 python3-xlib==0.15
 pytweening==1.0.4
+pywin32==305
