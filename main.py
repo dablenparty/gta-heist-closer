@@ -6,7 +6,9 @@ import traceback
 import psutil
 import signal
 import subprocess as sp
+import sys
 import time
+import types
 
 import cv2
 from python_imagesearch.imagesearch import imagesearch_region_loop
@@ -42,6 +44,68 @@ def is_user_admin():
     else:
         # check for root on posix
         return os.getuid() == 0
+
+
+def run_as_admin(cmdLine=None, wait=True):
+    """
+    Taken from: https://gist.github.com/sylvainpelissier/ff072a6759082590a4fe8f7e070a4952
+
+    Attempt to relaunch the current script as an admin using the same
+    command line parameters.  Pass cmdLine in to override and set a new
+    command.  It must be a list of [command, arg1, arg2...] format.
+    Set wait to False to avoid waiting for the sub-process to finish. You
+    will not be able to fetch the exit code of the process if wait is
+    False.
+    Returns the sub-process return code, unless wait is False in which
+    case it returns None.
+    @WARNING: this function only works on Windows.
+    """
+
+    if os.name != "nt":
+        raise RuntimeError("This function is only implemented on Windows.")
+
+    # these imports may not be able to be resolved by vscode. this is fine.
+    import win32api, win32con, win32event, win32process
+    from win32com.shell.shell import ShellExecuteEx
+    from win32com.shell import shellcon
+
+    python_exe = sys.executable
+
+    if cmdLine is None:
+        cmdLine = [python_exe] + sys.argv
+    elif type(cmdLine) not in (types.TupleType, types.ListType):
+        raise ValueError("cmdLine is not a sequence.")
+    cmd = '"%s"' % (cmdLine[0],)
+    # XXX TODO: isn't there a function or something we can call to massage command line params?
+    params = " ".join(['"%s"' % (x,) for x in cmdLine[1:]])
+    cmdDir = ""
+    showCmd = win32con.SW_SHOWNORMAL
+    lpVerb = "runas"  # causes UAC elevation prompt.
+
+    # print "Running", cmd, params
+
+    # ShellExecute() doesn't seem to allow us to fetch the PID or handle
+    # of the process, so we can't get anything useful from it. Therefore
+    # the more complex ShellExecuteEx() must be used.
+
+    # procHandle = win32api.ShellExecute(0, lpVerb, cmd, params, cmdDir, showCmd)
+
+    procInfo = ShellExecuteEx(
+        nShow=showCmd,
+        fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
+        lpVerb=lpVerb,
+        lpFile=cmd,
+        lpParameters=params,
+    )
+
+    if wait:
+        procHandle = procInfo["hProcess"]
+        obj = win32event.WaitForSingleObject(procHandle, win32event.INFINITE)
+        rc = win32process.GetExitCodeProcess(procHandle)
+    else:
+        rc = None
+
+    return rc
 
 
 def get_main_monitor_resolution():
@@ -107,8 +171,14 @@ def resize_image(image_path: Path, monitor_width: int):
 
 def main():
     args = parse_args()
-    if args.network and not is_user_admin():
-        raise RuntimeError("must be run as admin to disable network")
+    if args.network:
+        print('using "disable network"')
+        if not is_user_admin():
+            print("not running as admin, relaunching as admin")
+            ret = run_as_admin()
+            sys.exit(ret)
+    else:
+        print('using "kill process"')
     mon_width, mon_height = get_main_monitor_resolution()
     x1 = 0
     y1 = round(mon_height / 5.76)
@@ -132,7 +202,6 @@ def main():
         disable_network()
     else:
         kill_process()
-    input("press enter to exit...")
 
 
 if __name__ == "__main__":
