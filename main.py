@@ -3,7 +3,6 @@ import ctypes
 import os
 from pathlib import Path
 import traceback
-import psutil
 import signal
 import subprocess as sp
 import sys
@@ -114,17 +113,35 @@ def get_main_monitor_resolution():
     return screensize
 
 
+def get_net_interfaces():
+    output = sp.run("netsh interface show interface", shell=True, capture_output=True)
+    if output.returncode != 0:
+        raise RuntimeError("failed to get network interfaces")
+    decoded_output = output.stdout.decode("utf-8")
+    lines = decoded_output.splitlines()
+    # windows output has a blank line, column names, then a separator, with a blank at the end
+    lines = lines[3:-1]
+    splits = [line.split() for line in lines]
+    return tuple(map(lambda x: (x[0] == "Enabled", x[1] == "Connected", x[2], x[3]), splits))
+
+
+def find_process_by_name(name: str):
+    command = f"tasklist /fi \"imagename eq {name}\""
+    output = sp.run(command, shell=True, capture_output=True)
+    if output.returncode != 0:
+        raise RuntimeError(f"failed to find process {name}")
+    decoded_output = output.stdout.decode("utf-8")
+    lines = decoded_output.splitlines()
+    if len(lines) <= 3:
+        raise RuntimeError(f"failed to find process {name}: {decoded_output}")
+    lines = lines[3:]
+    splits = [line.split() for line in lines]
+    return tuple(map(lambda x: (x[0], int(x[1]), x[2], int(x[3]), x[4]), splits))
+
+
 def disable_network():
-    interfaces = psutil.net_if_addrs()
-
-    def interface_filter(interface_name: str):
-        lower_name = interface_name.lower()
-        return not (
-            lower_name.startswith("local area connection")
-            or lower_name.startswith("loopback")
-        )
-
-    interface_names = tuple(filter(interface_filter, interfaces.keys()))
+    interfaces = get_net_interfaces()
+    interface_names = tuple(map(lambda x: x[3], filter(lambda x: x[1], interfaces)))
     netsh_command = "netsh interface set interface"
     for name in interface_names:
         print(f"disabling {name}")
@@ -147,12 +164,12 @@ def disable_network():
 
 def kill_process():
     print("finding GTA5 process")
-    proc_iter = psutil.process_iter(attrs=None, ad_value=None)
-    gta_process = next((p for p in proc_iter if p.name().startswith("GTA5")), None)
+    proc_iter = find_process_by_name("GTA5.exe")
+    gta_process = next((p for p in proc_iter if p[0].startswith("GTA5")), None)
     if gta_process is None:
         print("failed to find GTA5 process")
         return
-    pid = gta_process.pid
+    pid = gta_process[1]
     print(f"found gta process with pid {pid}")
     # kill gta process
     print("killing gta process")
