@@ -14,13 +14,19 @@ def main():
         output = sp.check_output([this_interpreter, "-m", "pip", "list"])
         decoded = output.decode("utf-8")
         lines = decoded.splitlines()
+        tries = 0
         has_virtualenv = False
-        for line in lines:
-            if line.startswith("virtualenv"):
-                has_virtualenv = True
-                break
-        if not has_virtualenv:
-            raise RuntimeError("virtualenv not installed but required")
+        while not has_virtualenv:
+            if tries >= 3:
+                raise RuntimeError("failed to install virtualenv")
+            for line in lines:
+                if line.startswith("virtualenv"):
+                    has_virtualenv = True
+                    break
+            if not has_virtualenv:
+                print("virtualenv not found, attempting install...")
+                sp.run([this_interpreter, "-m", "pip", "install", "virtualenv"])
+            tries += 1
         sp.run([this_interpreter, "-m", "virtualenv", virtual_env_dir])
         requirements_file = this_file.parent / "requirements.txt"
         sp.run([virtual_interpreter, "-m", "pip", "install", "-r", requirements_file])
