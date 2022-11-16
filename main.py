@@ -141,7 +141,7 @@ def find_process_by_name(name: str):
 
 def disable_network():
     interfaces = get_net_interfaces()
-    interface_names = tuple(map(lambda x: x[3], filter(lambda x: x[1], interfaces)))
+    interface_names = tuple(map(lambda x: x[3], filter(lambda x: x[0], interfaces)))
     netsh_command = "netsh interface set interface"
     for name in interface_names:
         print(f"disabling {name}")
