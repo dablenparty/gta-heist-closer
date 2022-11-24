@@ -21,6 +21,7 @@ def parse_args():
         action="store_true",
         help="disables network instead of killing GTA process",
     )
+    parser.add_argument("--loop", "-l", action="store_true", help="loops the script")
     return parser.parse_args()
 
 
@@ -122,11 +123,13 @@ def get_net_interfaces():
     # windows output has a blank line, column names, then a separator, with a blank at the end
     lines = lines[3:-1]
     splits = [line.split() for line in lines]
-    return tuple(map(lambda x: (x[0] == "Enabled", x[1] == "Connected", x[2], x[3]), splits))
+    return tuple(
+        map(lambda x: (x[0] == "Enabled", x[1] == "Connected", x[2], x[3]), splits)
+    )
 
 
 def find_process_by_name(name: str):
-    command = f"tasklist /fi \"imagename eq {name}\""
+    command = f'tasklist /fi "imagename eq {name}"'
     output = sp.run(command, shell=True, capture_output=True)
     if output.returncode != 0:
         raise RuntimeError(f"failed to find process {name}")
@@ -171,6 +174,9 @@ def kill_process():
         return
     pid = gta_process[1]
     print(f"found gta process with pid {pid}")
+    timeout = 0.8
+    print(f"waiting {timeout} second")
+    time.sleep(timeout)
     # kill gta process
     print("killing gta process")
     os.kill(int(pid), signal.SIGTERM)
@@ -207,18 +213,21 @@ def main():
         print("resizing image")
         resize_image(this_file.parent / "heist_passed_cropped.jpg", mon_width)
 
-    print("Searching for image...")
-    # ? TODO: custom impl to cap directly from window
-    pos = imagesearch_region_loop(str(image_path), 0.2, x1, y1, x2, y2, 0.7)
-    if pos[0] == -1:
-        print("the image was somehow not found")
-        return
-    print(f"image located at {pos[0]}, {pos[1]}")
-    time.sleep(1)
-    if args.network:
-        disable_network()
-    else:
-        kill_process()
+    ran_once = False
+    while not ran_once or args.loop:
+        print("Searching for image...")
+        # ? TODO: custom impl to cap directly from window
+        pos = imagesearch_region_loop(str(image_path), 0.2, x1, y1, x2, y2, 0.7)
+        if pos[0] == -1:
+            print("the image was somehow not found")
+            return
+        print(f"image located at {pos[0]}, {pos[1]}")
+        time.sleep(1)
+        if args.network:
+            disable_network()
+        else:
+            kill_process()
+        ran_once = True
 
 
 if __name__ == "__main__":
