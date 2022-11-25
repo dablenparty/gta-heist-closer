@@ -1,6 +1,10 @@
+import os
+
+if os.name != "nt":
+    raise RuntimeError("This script is only implemented on Windows.")
+
 import argparse as ap
 import ctypes
-import os
 from pathlib import Path
 import traceback
 import signal
@@ -10,7 +14,13 @@ import time
 import types
 
 import cv2
-from python_imagesearch.imagesearch import imagesearch_region_loop
+from python_imagesearch.imagesearch import imagesearch_region_loop, imagesearcharea
+from PIL import Image
+
+# these imports may not be able to be resolved by vscode. this is fine.
+import win32api, win32con, win32event, win32gui, win32process, win32ui
+from win32com.shell.shell import ShellExecuteEx
+from win32com.shell import shellcon
 
 
 def parse_args():
@@ -60,14 +70,6 @@ def run_as_admin(cmdLine=None, wait=True):
     case it returns None.
     @WARNING: this function only works on Windows.
     """
-
-    if os.name != "nt":
-        raise RuntimeError("This function is only implemented on Windows.")
-
-    # these imports may not be able to be resolved by vscode. this is fine.
-    import win32api, win32con, win32event, win32process
-    from win32com.shell.shell import ShellExecuteEx
-    from win32com.shell import shellcon
 
     python_exe = sys.executable
 
@@ -174,7 +176,7 @@ def kill_process():
         return
     pid = gta_process[1]
     print(f"found gta process with pid {pid}")
-    timeout = 0.8
+    timeout = 0.2
     print(f"waiting {timeout} second")
     time.sleep(timeout)
     # kill gta process
@@ -190,6 +192,81 @@ def resize_image(image_path: Path, monitor_width: int):
     new_dim = (width, height)
     resized_img = cv2.resize(img, new_dim, interpolation=cv2.INTER_AREA)
     cv2.imwrite(str(image_path.parent / "heist_passed_resized.jpg"), resized_img)
+
+
+def capture_window_image(window_name: str, monitor_width: int, monitor_height: int):
+    """
+    Captures the window with the given name and returns it as a PIL image.
+
+    Taken from: https://stackoverflow.com/questions/6951557/pil-and-bitmap-from-winapi
+
+    :param window_name: name of the window to capture
+    :type window_name: str
+    :param monitor_width: width of the monitor
+    :type monitor_width: int
+    :param monitor_height: height of the monitor
+    :type monitor_height: int
+    :raises ValueError: if the window is not found
+    :return: the captured window as a PIL image
+    :rtype: Image
+    """
+    # there are ways to make this faster; however, at 0.02 seconds on a bad day (aka 60 fps), it's
+    # fast enough
+    window_handle = win32gui.FindWindow(None, window_name)
+    if window_handle == 0:
+        raise ValueError(f"failed to find window {window_name}")
+    window_DC = win32gui.GetWindowDC(window_handle)
+    dc_obj = win32ui.CreateDCFromHandle(window_DC)
+    compatible_cd = dc_obj.CreateCompatibleDC()
+
+    data_bit_map = win32ui.CreateBitmap()
+    data_bit_map.CreateCompatibleBitmap(dc_obj, monitor_width, monitor_height)
+    compatible_cd.SelectObject(data_bit_map)
+    compatible_cd.BitBlt(
+        (0, 0), (monitor_width, monitor_height), dc_obj, (0, 0), win32con.SRCCOPY
+    )
+
+    bitmap_info = data_bit_map.GetInfo()
+    bitmap_bits = data_bit_map.GetBitmapBits(True)
+    im = Image.frombuffer(
+        "RGB",
+        (bitmap_info["bmWidth"], bitmap_info["bmHeight"]),
+        bitmap_bits,
+        "raw",
+        "BGRX",
+        0,
+        1,
+    )
+
+    # free resources
+    dc_obj.DeleteDC()
+    compatible_cd.DeleteDC()
+    win32gui.ReleaseDC(window_handle, window_DC)
+    win32gui.DeleteObject(data_bit_map.GetHandle())
+
+    return im
+
+
+def image_search_loop(
+    mon_width: int,
+    mon_height: int,
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
+    image_path: str,
+    timeout=0.2,
+):
+    pos = (-1, -1)
+    while pos[0] == -1:
+        try:
+            im = capture_window_image("Grand Theft Auto V", mon_width, mon_height)
+        except ValueError:
+            pass
+        else:
+            pos = imagesearcharea(image_path, x1, y1, x2, y2, 0.7, im=im)
+        time.sleep(timeout)
+    return pos
 
 
 def main():
@@ -216,11 +293,7 @@ def main():
     ran_once = False
     while not ran_once or args.loop:
         print("Searching for image...")
-        # ? TODO: custom impl to cap directly from window
-        pos = imagesearch_region_loop(str(image_path), 0.2, x1, y1, x2, y2, 0.7)
-        if pos[0] == -1:
-            print("the image was somehow not found")
-            return
+        pos = image_search_loop(mon_width, mon_height, x1, y1, x2, y2, str(image_path))
         print(f"image located at {pos[0]}, {pos[1]}")
         time.sleep(1)
         if args.network:
