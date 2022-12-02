@@ -38,6 +38,25 @@ optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 
 [[package]]
+name = "customtkinter"
+version = "5.0.1"
+description = "Create modern looking GUIs with Python"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+darkdetect = "*"
+
+[[package]]
+name = "darkdetect"
+version = "0.7.1"
+description = "Detect OS Dark Mode from Python"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "mouseinfo"
 version = "0.1.3"
 description = "An application to display XY position and RGB color information for the pixel currently under the mouse. Works on Python 2 and 3."
@@ -2189,7 +2208,7 @@ python-versions = ">=3.5"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.11"
-content-hash = "a15a9aa405a111a061a296ca4cbbbc710a4d26fde2f46e0ff81bdc2cc0f63b27"
+content-hash = "541362f9557e6ec19ae2e86ed0e0dcb15ad0396d71aec93fa82c56168ec89772"
 
 [metadata.files]
 black = [
@@ -2222,6 +2241,14 @@ click = [
 colorama = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
+]
+customtkinter = [
+    {file = "customtkinter-5.0.1-py3-none-any.whl", hash = "sha256:a437966f71831a9b1f80301c5686f3b14848261cd3787ffe755f54a117ac30cc"},
+    {file = "customtkinter-5.0.1.tar.gz", hash = "sha256:2a63dbbde1fcd100aef69f9b3fd96b995d35e18f0f0bfb19303e87bf9103d999"},
+]
+darkdetect = [
+    {file = "darkdetect-0.7.1-py2.py3-none-any.whl", hash = "sha256:3efe69f8ecd5f1b7f4fbb0d1d93f656b0e493c45cc49222380ffe2a529cbc866"},
+    {file = "darkdetect-0.7.1.tar.gz", hash = "sha256:47be3cf5134432ddb616bbffc927237718407914993c82809983e7ccebf49013"},
 ]
 mouseinfo = [
     {file = "MouseInfo-0.1.3.tar.gz", hash = "sha256:2c62fb8885062b8e520a3cce0a297c657adcc08c60952eb05bc8256ef6f7f6e7"},
