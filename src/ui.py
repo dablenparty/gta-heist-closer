@@ -112,7 +112,7 @@ def kill_process():
     gta_proc.kill()
 
 
-def disable_network():
+def disable_network(timeout=20.0):
     interfaces = psutil.net_if_addrs()
     interface_names = tuple(
         filter(lambda x: not (x.lower().startswith("loopback") or x.lower().startswith("local")), interfaces))
@@ -122,7 +122,7 @@ def disable_network():
         if disable_result.returncode != 0:
             print(f"failed to disable {name}")
 
-    time.sleep(20)
+    time.sleep(timeout)
     for name in interface_names:
         disable_result = sp.run(f'{netsh_command} "{name}" enabled', shell=True)
         if disable_result.returncode != 0:
@@ -263,7 +263,7 @@ class App(ctk.CTk):
     def __init__(self, fg_color=None, **kwargs):
         super().__init__(fg_color, **kwargs)
 
-        self.title("GTA Cayo Perico Heist Closer")
+        self.title("GTA Cayo Perico Heist Monitor")
         self.geometry("400x400")
 
         self.grid_rowconfigure(4, weight=1)
@@ -291,23 +291,45 @@ class App(ctk.CTk):
                                                       value=RunOptions.KILL_PROCESS.value[0])
         self._kill_process_radio.grid(row=3, column=0, padx=10, pady=10, columnspan=1, sticky="nsew")
 
-        self._disable_network_radio = ctk.CTkRadioButton(self, text="Disable network", variable=self._run_var,
+        self._disable_network_radio = ctk.CTkRadioButton(self, text="Disable network (DOES NOT ALWAYS WORK)",
+                                                         variable=self._run_var,
                                                          value=RunOptions.DISABLE_NETWORK.value[0])
         self._disable_network_radio.grid(row=4, column=0, padx=10, pady=10, columnspan=1, sticky="nsew")
+        self._timeout_var = tk.IntVar(value=30)
+        self._network_timeout_entry = ctk.CTkSlider(self, from_=0, to=60, variable=self._timeout_var)
+        self._network_timeout_label = ctk.CTkLabel(self, text=f"Network timeout ({self._timeout_var.get()} seconds):",
+                                                   anchor=tk.W)
+        self._timeout_var.trace("w", self._handle_timeout_changed)
+
+        self._run_var.trace("w", self._handle_radio_changed)
 
         self._is_running_var.trace_add("write", self._handle_is_running_var_changed)
+
+    def _handle_timeout_changed(self, *_):
+        self._network_timeout_label.configure(text=f"Network timeout ({self._timeout_var.get()} seconds):")
+
+    def _handle_radio_changed(self, *_):
+        if self._run_var.get() == RunOptions.DISABLE_NETWORK.value[0]:
+            self._network_timeout_label.grid(row=5, column=0, padx=10, pady=10, columnspan=1, sticky="nsew")
+            self._network_timeout_entry.grid(row=6, column=0, padx=10, pady=10, columnspan=1, sticky="nsew")
+        else:
+            self._network_timeout_label.grid_remove()
+            self._network_timeout_entry.grid_remove()
 
     def _handle_is_running_var_changed(self, *_):
         if self._is_running_var.get():
             self._start_button.configure(text="Stop", command=self._handle_stop_clicked)
             self._kill_process_radio.configure(state=tk.DISABLED)
             self._disable_network_radio.configure(state=tk.DISABLED)
+            self._network_timeout_entry.configure(state=tk.DISABLED)
             kill_func = None
+            args = [kill_func]
             run_var_val = self._run_var.get()
             if run_var_val == 0:
                 kill_func = kill_process
             elif run_var_val == 1:
                 kill_func = disable_network
+                # append slider value
             self._worker_proc = mp.Process(target=image_search_worker, args=(kill_func,),
                                            daemon=True)
             self._worker_proc.start()
@@ -315,6 +337,7 @@ class App(ctk.CTk):
             self._start_button.configure(text="Start", command=self._handle_start_clicked)
             self._kill_process_radio.configure(state=tk.NORMAL)
             self._disable_network_radio.configure(state=tk.NORMAL)
+            self._network_timeout_entry.configure(state=tk.NORMAL)
 
     def _handle_start_clicked(self):
         self._is_running_var.set(True)
