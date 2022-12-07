@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "gta-heist-closer"
+version = "0.1.0"
+description = ""
+authors = ["dablenparty <hdavenport8902@gmail.com>"]
+readme = "README.md"
+packages = [{include = "gta_heist_closer"}]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.10"
+pillow = "^9.3.0"
+python-imagesearch = "^1.2.2"
+pywin32 = "^305"
+customtkinter = "^5.0.1"
+psutil = "^5.9.4"
+opencv-python = "4.5.3.56"
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.10.0"
+auto-py-to-exe = "^2.26.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
