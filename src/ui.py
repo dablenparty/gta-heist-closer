@@ -227,17 +227,26 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-def image_search_worker(monitor_width: int, monitor_height: int, kill_func: callable):
+def image_search_worker(kill_func: callable):
     print("starting image search worker")
+    gta_hwnd = win32gui.FindWindow(None, "Grand Theft Auto V")
+    if gta_hwnd == 0:
+        width, height = get_main_monitor_resolution()
+    else:
+        x, y, w, h = win32gui.GetWindowRect(gta_hwnd)
+        width = w - x
+        height = h - y
     x1 = 0
-    y1 = round(monitor_height / 5.76)
-    x2 = monitor_width
+    y1 = round(height / 5.76)
+    x2 = width
     y2 = y1 + 1000
-    image_path = Path(resource_path("heist_passed_resized.jpg"))
-    if not image_path.exists():
-        resize_image(Path(resource_path("heist_passed_cropped.jpg")), monitor_width)
+    resized_image_path = Path(resource_path("heist_passed_resized.jpg"))
+    cropped_image_path = Path(resource_path("heist_passed_cropped.jpg"))
+    resized_image_path.unlink(missing_ok=True)
+    resize_image(cropped_image_path, width)
+
     while True:
-        pos = image_search_loop(monitor_width, monitor_height, x1, y1, x2, y2, str(image_path))
+        pos = image_search_loop(width, height, x1, y1, x2, y2, str(resized_image_path))
         print(f"found heist passed at {pos}")
         # wait a tiny bit to make sure the heist is over
         # the number is completely arbitrary, but it seems to work
@@ -251,7 +260,7 @@ class RunOptions(enum.Enum):
 
 
 class App(ctk.CTk):
-    def __init__(self, fg_color = None, **kwargs):
+    def __init__(self, fg_color=None, **kwargs):
         super().__init__(fg_color, **kwargs)
 
         self.title("GTA Cayo Perico Heist Closer")
@@ -299,7 +308,7 @@ class App(ctk.CTk):
                 kill_func = kill_process
             elif run_var_val == 1:
                 kill_func = disable_network
-            self._worker_proc = mp.Process(target=image_search_worker, args=(*self._monitor_resolution, kill_func),
+            self._worker_proc = mp.Process(target=image_search_worker, args=(kill_func,),
                                            daemon=True)
             self._worker_proc.start()
         else:
